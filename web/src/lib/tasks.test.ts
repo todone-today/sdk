@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { keepIds, locate, nestUnder, putBack, unnest, parse, serialize, parseMinutes, relDue, validTasks } from "./tasks.ts";
+import { keepIds, moveTasks, nestUnder, takeTasks, unnest, parse, serialize, parseMinutes, relDue, validTasks } from "./tasks.ts";
 
 test("round-trips the CLI format", () => {
   const md = "- [ ] Write launch post ⏱ 2h 📅 2026-11-02\n  - [x] Outline ⏳ 50m\n  - [ ] Pick a title ⏱ 30m\n- [x] done\n";
@@ -71,13 +71,23 @@ test("dropping a task on another nests it, one level deep", () => {
   assert.deepEqual(r.map((t) => t.title), ["a", "b", "c", "b1"]);
 });
 
-test("a deleted task goes back where it was", () => {
-  const ts = parse("- [ ] a\n  - [ ] a1\n  - [ ] a2\n- [ ] b\n- [ ] c\n");
-  for (const id of [ts[1].id, ts[0].sub[1].id, ts[0].id]) {
-    const spot = locate(ts, id)!;
-    const without = ts.flatMap((t) => (t.id === id ? [] : [{ ...t, sub: t.sub.filter((x) => x.id !== id) }]));
-    assert.equal(serialize(putBack(without, spot)), serialize(ts));
-  }
+test("moves tasks before, after or into another", () => {
+  const ts = parse("- [ ] a\n  - [ ] a1\n  - [ ] a2\n- [ ] b\n  - [ ] b1\n- [ ] c\n");
+  const [a, b, c] = ts;
+  const titles = (xs: typeof ts) => xs.map((t) => (t.sub.length ? `${t.title}(${t.sub.map((x) => x.title)})` : t.title)).join(" ");
+  assert.equal(titles(moveTasks(ts, [c.id], a.id, "before")), "c a(a1,a2) b(b1)");
+  assert.equal(titles(moveTasks(ts, [a.id], c.id, "after")), "b(b1) c a(a1,a2)");
+  assert.equal(titles(moveTasks(ts, [b.id], c.id, "inside")), "a(a1,a2) c(b,b1)");
+  assert.equal(titles(moveTasks(ts, [c.id], a.sub[1].id, "before")), "a(a1,c,a2) b(b1)");
+  assert.equal(titles(moveTasks(ts, [a.sub[0].id, c.id], b.id, "after")), "a(a2) b(b1) a1 c");
+  assert.equal(moveTasks(ts, [a.id], a.id, "inside"), ts);
+});
+
+test("takes tasks out of a list", () => {
+  const ts = parse("- [ ] a\n  - [ ] a1\n- [ ] b\n");
+  const [taken, rest] = takeTasks(ts, [ts[0].sub[0].id, ts[1].id]);
+  assert.deepEqual(taken.map((t) => t.title), ["a1", "b"]);
+  assert.deepEqual([rest.length, rest[0].sub.length], [1, 0]);
 });
 
 test("reads what an AI tends to write", () => {

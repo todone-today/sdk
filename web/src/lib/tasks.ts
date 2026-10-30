@@ -13,7 +13,15 @@ export type Task = {
 };
 
 // kind "ideas" is the workspace's brainstorm board; it is stored like a list but kept out of lists and the calendar.
-export type List = { id: string; name: string; tasks: Task[]; updated: number; version: number; kind?: "ideas" };
+export type List = {
+  id: string;
+  name: string;
+  tasks: Task[];
+  updated: number;
+  version: number;
+  kind?: "ideas";
+  position?: number;
+};
 
 export const uid = () => Math.random().toString(36).slice(2, 10);
 
@@ -150,19 +158,46 @@ export function unnest(tasks: Task[], id: string): Task[] {
   return moved ? [...rest, moved] : tasks;
 }
 
-// Where a task sits, so a deleted one can be put back exactly (undo).
-export type Spot = { task: Task; parentId: string | null; index: number };
-export function locate(tasks: Task[], id: string): Spot | null {
-  for (const [i, t] of tasks.entries()) {
-    if (t.id === id) return { task: t, parentId: null, index: i };
-    const j = t.sub.findIndex((x) => x.id === id);
-    if (j >= 0) return { task: t.sub[j], parentId: t.id, index: j };
+export type Place = "before" | "after" | "inside";
+
+// Moves tasks (in the order given) next to a target task, or into it as subtasks. Next to a subtask they
+// become subtasks of the same parent; next to a main task they stay main tasks. Subtasks are one level deep,
+// so a task with subtasks that lands inside or among subtasks brings them along as siblings.
+export function moveTasks(tasks: Task[], ids: string[], targetId: string, place: Place): Task[] {
+  if (ids.includes(targetId)) return tasks;
+  const moved: Task[] = [];
+  let rest = tasks;
+  for (const id of ids) {
+    const [t, r] = pluck(rest, id);
+    if (t) moved.push(t);
+    rest = r;
   }
-  return null;
+  if (!moved.length) return tasks;
+  const flat = moved.flatMap((t) => [{ ...t, sub: [] }, ...t.sub]);
+  const top = rest.findIndex((t) => t.id === targetId);
+  if (top >= 0) {
+    if (place === "inside")
+      return rest.map((t) => (t.id === targetId ? { ...t, sub: [...t.sub, ...flat] } : t));
+    const i = place === "before" ? top : top + 1;
+    return [...rest.slice(0, i), ...moved, ...rest.slice(i)];
+  }
+  const parent = rest.find((t) => t.sub.some((x) => x.id === targetId));
+  if (!parent) return tasks;
+  return rest.map((t) => {
+    if (t !== parent) return t;
+    const j = t.sub.findIndex((x) => x.id === targetId) + (place === "before" ? 0 : 1);
+    return { ...t, sub: [...t.sub.slice(0, j), ...flat, ...t.sub.slice(j)] };
+  });
 }
-export function putBack(tasks: Task[], { task, parentId, index }: Spot): Task[] {
-  const at = <T,>(xs: T[], x: T) => [...xs.slice(0, index), x, ...xs.slice(index)];
-  if (parentId && tasks.some((t) => t.id === parentId))
-    return tasks.map((t) => (t.id === parentId ? { ...t, sub: at(t.sub, task) } : t));
-  return at(tasks, task);
+
+// Takes tasks out of a list, for moving them to another one; returns what was taken and what's left.
+export function takeTasks(tasks: Task[], ids: string[]): [Task[], Task[]] {
+  const taken: Task[] = [];
+  let rest = tasks;
+  for (const id of ids) {
+    const [t, r] = pluck(rest, id);
+    if (t) taken.push(t);
+    rest = r;
+  }
+  return [taken, rest];
 }
