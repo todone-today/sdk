@@ -54,3 +54,14 @@ export function lanes<T extends { start: number; end: number }>(items: T[]): (T 
   close();
   return out;
 }
+
+export const VIEWS = ["day", "week", "month", "year"] as const;
+export type CalView = (typeof VIEWS)[number];
+
+// The first and last day a view shows around a date.
+export function rangeOf(view: CalView, at: string): [string, string] {
+  if (view === "day") return [at, at];
+  if (view === "week") return [weekStart(at), addDays(weekStart(at), 6)];
+  if (view === "month") return [monthStart(at), addDays(addMonths(at, 1), -1)];
+  return [`${at.slice(0, 4)}-01-01`, `${at.slice(0, 4)}-12-31`];
+}

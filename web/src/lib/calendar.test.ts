@@ -33,3 +33,11 @@ test("shifts by months and years, keeping the day inside the month", () => {
   assert.equal(shiftMonths("2026-10-31", 12), "2027-10-31");
   assert.equal(shiftMonths("2028-02-29", 12), "2029-02-28");
 });
+
+test("a view covers its day, week, month or year", async () => {
+  const { rangeOf } = await import("./calendar.ts");
+  assert.deepEqual(rangeOf("day", "2026-10-31"), ["2026-10-31", "2026-10-31"]);
+  assert.deepEqual(rangeOf("week", "2026-10-31"), ["2026-10-26", "2026-11-01"]);
+  assert.deepEqual(rangeOf("month", "2026-02-10"), ["2026-02-01", "2026-02-28"]);
+  assert.deepEqual(rangeOf("year", "2026-06-01"), ["2026-01-01", "2026-12-31"]);
+});
