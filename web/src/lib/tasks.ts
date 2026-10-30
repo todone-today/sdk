@@ -38,7 +38,8 @@ function meta(text: string): Omit<Task, "id" | "done" | "sub"> {
   let s = text;
   const t: Omit<Task, "id" | "done" | "sub"> = { title: "" };
   s = s.replace(/ ?📅 (\d{4}-\d{2}-\d{2})/u, (_, d) => ((t.due = d), ""));
-  s = s.replace(/ ?⏰ ([01]\d|2[0-3]):([0-5]\d)/u, (_, h, m) => ((t.at = `${h}:${m}`), ""));
+  // "9:30" or "09:30"; anything past 23:59 is left in the title.
+  s = s.replace(/ ?⏰ ([01]?\d|2[0-3]):([0-5]\d)/u, (_, h, m) => ((t.at = `${h.padStart(2, "0")}:${m}`), ""));
   s = s.replace(/ ?⏱️? ([0-9hm.]+)/u, (_, e) => ((t.est = parseMinutes(e) ?? undefined), ""));
   s = s.replace(/ ?⏳ ([0-9hm.]+)/u, (_, e) => ((t.spent = parseMinutes(e) ?? undefined), ""));
   t.title = s.trim();

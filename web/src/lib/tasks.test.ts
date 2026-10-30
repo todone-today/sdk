@@ -79,3 +79,9 @@ test("a deleted task goes back where it was", () => {
     assert.equal(serialize(putBack(without, spot)), serialize(ts));
   }
 });
+
+test("reads what an AI tends to write", () => {
+  const [a, b] = parse("```\n- [ ] Call mum ⏰ 9:30 📅 2026-11-02\n- [ ] Gym ⏱️ 1h\n```\n");
+  assert.deepEqual([a.title, a.at, a.due], ["Call mum", "09:30", "2026-11-02"]);
+  assert.deepEqual([b.title, b.est], ["Gym", 60]);
+});
