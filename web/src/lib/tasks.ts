@@ -201,3 +201,15 @@ export function takeTasks(tasks: Task[], ids: string[]): [Task[], Task[]] {
   }
   return [taken, rest];
 }
+
+// How late an open task is, in minutes: past its time today, or any time after its day. null if it isn't.
+export function lateBy(t: Pick<Task, "due" | "at" | "done">, today: string, nowMin: number): number | null {
+  if (t.done || !t.due || t.due > today) return null;
+  if (t.due < today) return Infinity; // a day or more: the date chip already says "Nd late"
+  if (!t.at) return null;
+  const m = nowMin - (+t.at.slice(0, 2) * 60 + +t.at.slice(3, 5));
+  return m > 0 ? m : null;
+}
+
+// "20m late", "3h late" for today; days are relDue's job.
+export const lateLabel = (m: number) => (m < 60 ? `${m}m late` : `${Math.floor(m / 60)}h late`);

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { keepIds, moveTasks, nestUnder, takeTasks, unnest, parse, serialize, parseMinutes, relDue, validTasks } from "./tasks.ts";
+import { keepIds, lateBy, lateLabel, moveTasks, nestUnder, takeTasks, unnest, parse, serialize, parseMinutes, relDue, validTasks } from "./tasks.ts";
 
 test("round-trips the CLI format", () => {
   const md = "- [ ] Write launch post ⏱ 2h 📅 2026-11-02\n  - [x] Outline ⏳ 50m\n  - [ ] Pick a title ⏱ 30m\n- [x] done\n";
@@ -94,4 +94,16 @@ test("reads what an AI tends to write", () => {
   const [a, b] = parse("```\n- [ ] Call mum ⏰ 9:30 📅 2026-11-02\n- [ ] Gym ⏱️ 1h\n```\n");
   assert.deepEqual([a.title, a.at, a.due], ["Call mum", "09:30", "2026-11-02"]);
   assert.deepEqual([b.title, b.est], ["Gym", 60]);
+});
+
+test("a task is late after its time today, or after its day", () => {
+  const today = "2026-10-31";
+  const at330 = { due: today, at: "03:30", done: false };
+  assert.equal(lateBy(at330, today, 3 * 60 + 50), 20);
+  assert.equal(lateBy(at330, today, 3 * 60 + 30), null);
+  assert.equal(lateBy({ ...at330, done: true }, today, 600), null);
+  assert.equal(lateBy({ due: "2026-10-30", done: false }, today, 0), Infinity);
+  assert.equal(lateBy({ due: today, done: false }, today, 1400), null); // no time: due by the end of the day
+  assert.equal(lateBy({ due: "2026-11-01", at: "01:00", done: false }, today, 600), null);
+  assert.deepEqual([lateLabel(20), lateLabel(185)], ["20m late", "3h late"]);
 });
