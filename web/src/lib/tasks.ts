@@ -10,6 +10,7 @@ export type Task = {
   est?: number; // minutes
   spent?: number; // minutes in focus
   pri?: 1 | 2 | 3; // priority: 1 high, 2 medium, 3 low (Obsidian Tasks: ⏫ 🔼 🔽)
+  rep?: string; // repeats: "every day", "every weekday", "every 2 weeks", ... (Obsidian Tasks: 🔁)
   sub: Task[];
 };
 
@@ -49,6 +50,7 @@ const LINE = /^([ \t]*)- \[([ xX])\] (.*)$/;
 function meta(text: string): Omit<Task, "id" | "done" | "sub"> {
   let s = text;
   const t: Omit<Task, "id" | "done" | "sub"> = { title: "" };
+  s = s.replace(/ ?🔁 ([a-z0-9 ]+?)(?= [^\sa-z0-9]|$)/iu, (m, r) => (validRepeat(r.trim()) ? ((t.rep = r.trim().toLowerCase()), "") : m));
   s = s.replace(/ ?📅 (\d{4}-\d{2}-\d{2})/u, (_, d) => ((t.due = d), ""));
   s = s.replace(/ ?(⏫|🔼|🔽)/u, (_, p) => ((t.pri = (PRI_MARK.indexOf(p) + 1) as 1 | 2 | 3), ""));
   // "9:30" or "09:30"; anything past 23:59 is left in the title.
@@ -76,6 +78,7 @@ export function parse(md: string): Task[] {
 function line(t: Task, indent: string): string {
   const fields =
     (t.pri ? ` ${PRI_MARK[t.pri - 1]}` : "") +
+    (t.rep ? ` 🔁 ${t.rep}` : "") +
     (t.est ? ` ⏱ ${fmtMinutes(t.est)}` : "") +
     (t.due ? ` 📅 ${t.due}` : "") +
     (t.at ? ` ⏰ ${t.at}` : "") +
@@ -123,6 +126,7 @@ export function validTasks(x: unknown, depth = 0): x is Task[] {
         (t.at === undefined || (typeof t.at === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(t.at))) &&
         mins(t.est) &&
         (t.pri === undefined || t.pri === 1 || t.pri === 2 || t.pri === 3) &&
+        (t.rep === undefined || (typeof t.rep === "string" && validRepeat(t.rep))) &&
         mins(t.spent) &&
         (depth ? Array.isArray(t.sub) && t.sub.length === 0 : validTasks(t.sub, 1)),
     )
@@ -219,3 +223,53 @@ export function lateBy(t: Pick<Task, "due" | "at" | "done">, today: string, nowM
 
 // "20m late", "3h late" for today; days are relDue's job.
 export const lateLabel = (m: number) => (m < 60 ? `${m}m late` : `${Math.floor(m / 60)}h late`);
+
+// Repeating tasks: "every day", "every weekday", "every week", "every 2 weeks", "every month", "every year".
+const REPEAT = /^every (?:weekday|(?:(\d{1,3}) )?(day|week|month|year)s?)$/i;
+export const validRepeat = (r: string) => REPEAT.test(r.trim());
+
+const D = (iso: string) => new Date(Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10)));
+const iso = (d: Date) => d.toISOString().slice(0, 10);
+
+// The next due day after `from` for a repeat rule; months keep the day inside the month (Jan 31 -> Feb 28).
+export function nextDue(from: string, rule: string): string {
+  if (/weekday/i.test(rule)) {
+    const d = D(from);
+    do d.setUTCDate(d.getUTCDate() + 1);
+    while (d.getUTCDay() === 0 || d.getUTCDay() === 6);
+    return iso(d);
+  }
+  const [, n = "1", unit] = REPEAT.exec(rule.trim())!;
+  const k = +n;
+  const d = D(from);
+  if (unit.toLowerCase() === "day") d.setUTCDate(d.getUTCDate() + k);
+  else if (unit.toLowerCase() === "week") d.setUTCDate(d.getUTCDate() + 7 * k);
+  else {
+    const months = unit.toLowerCase() === "month" ? k : 12 * k;
+    const day = d.getUTCDate();
+    d.setUTCDate(1);
+    d.setUTCMonth(d.getUTCMonth() + months);
+    d.setUTCDate(Math.min(day, new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate()));
+  }
+  return iso(d);
+}
+
+// Ticks a task (or unticks it). Finishing a repeating task keeps it done and adds the next one right after it,
+// due on the next day of its rule, with its steps unticked; the finished one stops repeating.
+export function tick(tasks: Task[], id: string, today: string): Task[] {
+  const next = (t: Task): Task => ({
+    ...t,
+    id: uid(),
+    done: false,
+    spent: undefined,
+    due: nextDue(t.due ?? today, t.rep!),
+    sub: t.sub.map((x) => ({ ...x, id: uid(), done: false, spent: undefined })),
+  });
+  const walk = (ts: Task[]): Task[] =>
+    ts.flatMap((t) => {
+      if (t.id !== id) return [{ ...t, sub: walk(t.sub) }];
+      if (t.done || !t.rep) return [{ ...t, done: !t.done }];
+      return [{ ...t, done: true, rep: undefined }, next(t)];
+    });
+  return walk(tasks);
+}

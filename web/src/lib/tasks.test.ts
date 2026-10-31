@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { keepIds, lateBy, lateLabel, moveTasks, nestUnder, takeTasks, unnest, parse, serialize, parseMinutes, relDue, validTasks } from "./tasks.ts";
+import { keepIds, lateBy, lateLabel, moveTasks, nextDue, tick, nestUnder, takeTasks, unnest, parse, serialize, parseMinutes, relDue, validTasks } from "./tasks.ts";
 
 test("round-trips the CLI format", () => {
   const md = "- [ ] Write launch post ⏱ 2h 📅 2026-11-02\n  - [x] Outline ⏳ 50m\n  - [ ] Pick a title ⏱ 30m\n- [x] done\n";
@@ -115,4 +115,34 @@ test("keeps a priority", () => {
   assert.equal(serialize([a, b]), md);
   assert.ok(validTasks([a, b]));
   assert.ok(!validTasks([{ ...a, pri: 4 as 1 }]));
+});
+
+test("repeat rules give the next due day", () => {
+  assert.equal(nextDue("2026-10-30", "every day"), "2026-10-31");
+  assert.equal(nextDue("2026-10-30", "every weekday"), "2026-11-02"); // Friday -> Monday
+  assert.equal(nextDue("2026-10-30", "every 2 weeks"), "2026-11-13");
+  assert.equal(nextDue("2026-01-31", "every month"), "2026-02-28");
+  assert.equal(nextDue("2028-02-29", "every year"), "2029-02-28");
+  assert.equal(nextDue("2026-10-30", "every 3 days"), "2026-11-02");
+});
+
+test("ticking a repeating task makes the next one", () => {
+  const md = "- [ ] Water plants 🔁 every week ⏱ 15m 📅 2026-10-30 ⏰ 09:00\n  - [x] Ferns\n- [ ] Once\n";
+  const ts = parse(md);
+  assert.equal(ts[0].rep, "every week");
+  assert.equal(serialize(ts), md);
+  const after = tick(ts, ts[0].id, "2026-10-31");
+  assert.deepEqual(
+    after.map((t) => [t.title, t.done, t.due, t.rep, t.at, t.sub.map((x) => x.done)]),
+    [
+      ["Water plants", true, "2026-10-30", undefined, "09:00", [true]],
+      ["Water plants", false, "2026-11-06", "every week", "09:00", [false]],
+      ["Once", false, undefined, undefined, undefined, []],
+    ],
+  );
+  assert.notEqual(after[1].id, after[0].id);
+  assert.equal(tick(after, after[2].id, "2026-10-31")[2].done, true);
+  // Undated: the next one counts from today.
+  const [u] = parse("- [ ] Stretch 🔁 every day\n");
+  assert.equal(tick([u], u.id, "2026-10-31")[1].due, "2026-11-01");
 });
