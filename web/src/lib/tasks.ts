@@ -290,3 +290,6 @@ export function repeatLabel(rule: string): string {
   };
   return named[r] ?? r[0].toUpperCase() + r.slice(1);
 }
+
+// A repeating task whose next day hasn't come: it waits out of sight (in Open and the counts) until then.
+export const waiting = (t: Task, today: string) => !t.done && !!t.rep && !!t.due && t.due > today;
