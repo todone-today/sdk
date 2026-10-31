@@ -8,14 +8,15 @@ const items = parse(
 ).map((task) => ({ task, list: "Life" }));
 
 test("reminds shortly before a task's time, once per occurrence", () => {
-  const n = dueNotes(items, "2026-11-02", 9 * 60 + 20);
+  const reminders = (m: number) => dueNotes(items, "2026-11-02", m).filter((x) => x.key.startsWith("t:"));
+  const n = reminders(9 * 60 + 20);
   assert.deepEqual(
     n.map((x) => [x.title, x.body]),
     [["Dentist", "At 09:30 · Life"]],
   );
   assert.match(n[0].key, /^t:.+:2026-11-02:09:30$/);
-  assert.equal(dueNotes(items, "2026-11-02", 9 * 60).length, 0); // 30 minutes out: not yet
-  assert.equal(dueNotes(items, "2026-11-02", 9 * 60 + 35)[0].body, "Started 09:30 · Life"); // a late run still sends it
+  assert.equal(reminders(9 * 60).length, 0); // 30 minutes out: not yet
+  assert.equal(reminders(9 * 60 + 35)[0].body, "Started 09:30 · Life"); // a late run still sends it
 });
 
 test("a morning digest of today and what's late", () => {
@@ -30,4 +31,10 @@ test("local time in the person's zone", () => {
   const now = new Date("2026-11-01T22:45:00Z");
   assert.deepEqual(localNow(now, "Asia/Kolkata"), { today: "2026-11-02", nowMin: 4 * 60 + 15 });
   assert.deepEqual(localNow(now, "America/New_York"), { today: "2026-11-01", nowMin: 17 * 60 + 45 });
+});
+
+test("a late run still sends the digest and recent reminders", () => {
+  assert.equal(dueNotes(items, "2026-11-02", 13 * 60).filter((n) => n.key.startsWith("d:")).length, 1);
+  assert.equal(dueNotes(items, "2026-11-02", 9 * 60 + 55).find((n) => n.key.startsWith("t:"))?.body, "Started 09:30 · Life");
+  assert.equal(dueNotes(items, "2026-11-02", 7 * 60 + 59).length, 0);
 });

@@ -26,20 +26,20 @@ export function localNow(now: Date, timeZone: string): { today: string; nowMin: 
   return { today: `${p.year}-${p.month}-${p.day}`, nowMin: +p.hour * 60 + +p.minute };
 }
 
-// Tasks starting within `ahead` minutes (or that started in the last few, if the run was late),
-// and once a day around 08:00, what's due today and what's late.
+// Tasks starting within `ahead` minutes (or that started in the last half hour, if a run was late),
+// and on the first run at or after 08:00, what's due today and what's late. Keys make each go out once.
 export function dueNotes(items: Item[], today: string, nowMin: number, ahead = 15): Note[] {
   const open = items.filter((i) => !i.task.done);
   const notes: Note[] = open
     .filter(
-      (i) => i.task.due === today && i.task.at && toMin(i.task.at) - nowMin <= ahead && toMin(i.task.at) - nowMin > -10,
+      (i) => i.task.due === today && i.task.at && toMin(i.task.at) - nowMin <= ahead && toMin(i.task.at) - nowMin > -30,
     )
     .map(({ task: t, list }) => ({
       key: `t:${t.id}:${t.due}:${t.at}`,
       title: t.title,
       body: `${toMin(t.at!) > nowMin ? `At ${t.at}` : `Started ${t.at}`} · ${list}`,
     }));
-  if (nowMin >= DIGEST_AT && nowMin < DIGEST_AT + 60) {
+  if (nowMin >= DIGEST_AT) {
     const todays = open.filter((i) => i.task.due === today);
     const late = open.filter((i) => i.task.due && i.task.due < today);
     if (todays.length || late.length)
