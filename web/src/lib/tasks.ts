@@ -50,7 +50,9 @@ const LINE = /^([ \t]*)- \[([ xX])\] (.*)$/;
 function meta(text: string): Omit<Task, "id" | "done" | "sub"> {
   let s = text;
   const t: Omit<Task, "id" | "done" | "sub"> = { title: "" };
-  s = s.replace(/ ?🔁 ([a-z0-9 ]+?)(?= [^\sa-z0-9]|$)/iu, (m, r) => (validRepeat(r.trim()) ? ((t.rep = r.trim().toLowerCase()), "") : m));
+  s = s.replace(/ ?🔁 ([a-z0-9 ]+?)(?= [^\sa-z0-9]|$)/iu, (m, r) =>
+    validRepeat(r.trim()) ? ((t.rep = r.trim().toLowerCase()), "") : m,
+  );
   s = s.replace(/ ?📅 (\d{4}-\d{2}-\d{2})/u, (_, d) => ((t.due = d), ""));
   s = s.replace(/ ?(⏫|🔼|🔽)/u, (_, p) => ((t.pri = (PRI_MARK.indexOf(p) + 1) as 1 | 2 | 3), ""));
   // "9:30" or "09:30"; anything past 23:59 is left in the title.
@@ -224,8 +226,8 @@ export function lateBy(t: Pick<Task, "due" | "at" | "done">, today: string, nowM
 // "20m late", "3h late" for today; days are relDue's job.
 export const lateLabel = (m: number) => (m < 60 ? `${m}m late` : `${Math.floor(m / 60)}h late`);
 
-// Repeating tasks: "every day", "every weekday", "every week", "every 2 weeks", "every month", "every year".
-const REPEAT = /^every (?:weekday|(?:(\d{1,3}) )?(day|week|month|year)s?)$/i;
+// Repeating tasks: "every day", "every weekday", "every weekend", "every week", "every 2 weeks", "every month", ...
+const REPEAT = /^every (?:weekday|weekend|(?:(\d{1,3}) )?(day|week|month|year)s?)$/i;
 export const validRepeat = (r: string) => REPEAT.test(r.trim());
 
 const D = (iso: string) => new Date(Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10)));
@@ -233,10 +235,11 @@ const iso = (d: Date) => d.toISOString().slice(0, 10);
 
 // The next due day after `from` for a repeat rule; months keep the day inside the month (Jan 31 -> Feb 28).
 export function nextDue(from: string, rule: string): string {
-  if (/weekday/i.test(rule)) {
+  if (/week(day|end)/i.test(rule)) {
+    const weekend = /weekend/i.test(rule);
     const d = D(from);
     do d.setUTCDate(d.getUTCDate() + 1);
-    while (d.getUTCDay() === 0 || d.getUTCDay() === 6);
+    while ((d.getUTCDay() === 0 || d.getUTCDay() === 6) !== weekend);
     return iso(d);
   }
   const [, n = "1", unit] = REPEAT.exec(rule.trim())!;
@@ -272,4 +275,18 @@ export function tick(tasks: Task[], id: string, today: string): Task[] {
       return [{ ...t, done: true, rep: undefined }, next(t)];
     });
   return walk(tasks);
+}
+
+// How a repeat rule reads on a chip: "Daily", "Weekdays", "Every 2 weeks".
+export function repeatLabel(rule: string): string {
+  const r = rule.trim().toLowerCase();
+  const named: Record<string, string> = {
+    "every day": "Daily",
+    "every weekday": "Weekdays",
+    "every weekend": "Weekends",
+    "every week": "Weekly",
+    "every month": "Monthly",
+    "every year": "Yearly",
+  };
+  return named[r] ?? r[0].toUpperCase() + r.slice(1);
 }

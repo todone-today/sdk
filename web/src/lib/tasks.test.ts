@@ -1,6 +1,22 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { keepIds, lateBy, lateLabel, moveTasks, nextDue, tick, nestUnder, takeTasks, unnest, parse, serialize, parseMinutes, relDue, validTasks } from "./tasks.ts";
+import {
+  keepIds,
+  lateBy,
+  lateLabel,
+  moveTasks,
+  nextDue,
+  repeatLabel,
+  tick,
+  nestUnder,
+  takeTasks,
+  unnest,
+  parse,
+  serialize,
+  parseMinutes,
+  relDue,
+  validTasks,
+} from "./tasks.ts";
 
 test("round-trips the CLI format", () => {
   const md = "- [ ] Write launch post ⏱ 2h 📅 2026-11-02\n  - [x] Outline ⏳ 50m\n  - [ ] Pick a title ⏱ 30m\n- [x] done\n";
@@ -61,20 +77,30 @@ test("dropping a task on another nests it, one level deep", () => {
   const ts = parse("- [ ] a\n- [ ] b\n  - [ ] b1\n- [ ] c\n");
   const [a, b, c] = ts;
   let r = nestUnder(ts, b.id, a.id);
-  assert.deepEqual(r.map((t) => t.title), ["a", "c"]);
-  assert.deepEqual(r[0].sub.map((t) => t.title), ["b", "b1"]);
+  assert.deepEqual(
+    r.map((t) => t.title),
+    ["a", "c"],
+  );
+  assert.deepEqual(
+    r[0].sub.map((t) => t.title),
+    ["b", "b1"],
+  );
   r = nestUnder(ts, b.sub[0].id, c.id);
   assert.deepEqual([r[1].sub.length, r[2].sub[0].title], [0, "b1"]);
   assert.equal(nestUnder(ts, a.id, a.id), ts);
   assert.equal(nestUnder(ts, a.id, b.sub[0].id), ts); // only main tasks take subtasks
   r = unnest(ts, b.sub[0].id);
-  assert.deepEqual(r.map((t) => t.title), ["a", "b", "c", "b1"]);
+  assert.deepEqual(
+    r.map((t) => t.title),
+    ["a", "b", "c", "b1"],
+  );
 });
 
 test("moves tasks before, after or into another", () => {
   const ts = parse("- [ ] a\n  - [ ] a1\n  - [ ] a2\n- [ ] b\n  - [ ] b1\n- [ ] c\n");
   const [a, b, c] = ts;
-  const titles = (xs: typeof ts) => xs.map((t) => (t.sub.length ? `${t.title}(${t.sub.map((x) => x.title)})` : t.title)).join(" ");
+  const titles = (xs: typeof ts) =>
+    xs.map((t) => (t.sub.length ? `${t.title}(${t.sub.map((x) => x.title)})` : t.title)).join(" ");
   assert.equal(titles(moveTasks(ts, [c.id], a.id, "before")), "c a(a1,a2) b(b1)");
   assert.equal(titles(moveTasks(ts, [a.id], c.id, "after")), "b(b1) c a(a1,a2)");
   assert.equal(titles(moveTasks(ts, [b.id], c.id, "inside")), "a(a1,a2) c(b,b1)");
@@ -86,7 +112,10 @@ test("moves tasks before, after or into another", () => {
 test("takes tasks out of a list", () => {
   const ts = parse("- [ ] a\n  - [ ] a1\n- [ ] b\n");
   const [taken, rest] = takeTasks(ts, [ts[0].sub[0].id, ts[1].id]);
-  assert.deepEqual(taken.map((t) => t.title), ["a1", "b"]);
+  assert.deepEqual(
+    taken.map((t) => t.title),
+    ["a1", "b"],
+  );
   assert.deepEqual([rest.length, rest[0].sub.length], [1, 0]);
 });
 
@@ -154,4 +183,16 @@ test("demo lists are valid and dated from today", async () => {
   const plan = lists[0].tasks.find((t) => t.title === "Plan the week")!;
   assert.deepEqual([plan.due, plan.at, plan.pri, plan.sub.length], ["2026-10-31", "16:00", 1, 2]);
   assert.equal(lists[0].tasks.find((t) => t.rep)?.due, "2026-11-01");
+});
+
+test("weekends repeat on Saturday and Sunday", () => {
+  assert.equal(nextDue("2026-10-30", "every weekend"), "2026-10-31"); // Fri -> Sat
+  assert.equal(nextDue("2026-10-31", "every weekend"), "2026-11-01"); // Sat -> Sun
+  assert.equal(nextDue("2026-11-01", "every weekend"), "2026-11-07"); // Sun -> next Sat
+  assert.equal(parse("- [ ] Hike 🔁 every weekend\n")[0].rep, "every weekend");
+  assert.deepEqual(["every weekday", "every weekend", "every 2 weeks"].map(repeatLabel), [
+    "Weekdays",
+    "Weekends",
+    "Every 2 weeks",
+  ]);
 });
