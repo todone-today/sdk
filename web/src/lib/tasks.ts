@@ -9,6 +9,7 @@ export type Task = {
   at?: string; // HH:MM on the due day: when to do it
   est?: number; // minutes
   spent?: number; // minutes in focus
+  pri?: 1 | 2 | 3; // priority: 1 high, 2 medium, 3 low (Obsidian Tasks: ⏫ 🔼 🔽)
   sub: Task[];
 };
 
@@ -40,12 +41,16 @@ export function fmtMinutes(m: number): string {
   return h ? `${h}h${r ? `${r}m` : ""}` : `${r}m`;
 }
 
+// Priority markers, high to low, as Obsidian Tasks writes them.
+export const PRI_MARK = ["⏫", "🔼", "🔽"];
+
 const LINE = /^([ \t]*)- \[([ xX])\] (.*)$/;
 
 function meta(text: string): Omit<Task, "id" | "done" | "sub"> {
   let s = text;
   const t: Omit<Task, "id" | "done" | "sub"> = { title: "" };
   s = s.replace(/ ?📅 (\d{4}-\d{2}-\d{2})/u, (_, d) => ((t.due = d), ""));
+  s = s.replace(/ ?(⏫|🔼|🔽)/u, (_, p) => ((t.pri = (PRI_MARK.indexOf(p) + 1) as 1 | 2 | 3), ""));
   // "9:30" or "09:30"; anything past 23:59 is left in the title.
   s = s.replace(/ ?⏰ ([01]?\d|2[0-3]):([0-5]\d)/u, (_, h, m) => ((t.at = `${h.padStart(2, "0")}:${m}`), ""));
   s = s.replace(/ ?⏱️? ([0-9hm.]+)/u, (_, e) => ((t.est = parseMinutes(e) ?? undefined), ""));
@@ -70,6 +75,7 @@ export function parse(md: string): Task[] {
 
 function line(t: Task, indent: string): string {
   const fields =
+    (t.pri ? ` ${PRI_MARK[t.pri - 1]}` : "") +
     (t.est ? ` ⏱ ${fmtMinutes(t.est)}` : "") +
     (t.due ? ` 📅 ${t.due}` : "") +
     (t.at ? ` ⏰ ${t.at}` : "") +
@@ -116,6 +122,7 @@ export function validTasks(x: unknown, depth = 0): x is Task[] {
         (t.due === undefined || (typeof t.due === "string" && /^\d{4}-\d{2}-\d{2}$/.test(t.due))) &&
         (t.at === undefined || (typeof t.at === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(t.at))) &&
         mins(t.est) &&
+        (t.pri === undefined || t.pri === 1 || t.pri === 2 || t.pri === 3) &&
         mins(t.spent) &&
         (depth ? Array.isArray(t.sub) && t.sub.length === 0 : validTasks(t.sub, 1)),
     )
@@ -135,7 +142,7 @@ export function keepIds(before: Task[], after: Task[]): Task[] {
 const pluck = (tasks: Task[], id: string): [Task | undefined, Task[]] => {
   let found: Task | undefined;
   const rest = tasks.flatMap((t) => {
-    if (t.id === id) return (found = t), [];
+    if (t.id === id) return ((found = t), []);
     const sub = t.sub.filter((x) => (x.id === id ? ((found = x), false) : true));
     return [{ ...t, sub }];
   });
@@ -176,8 +183,7 @@ export function moveTasks(tasks: Task[], ids: string[], targetId: string, place:
   const flat = moved.flatMap((t) => [{ ...t, sub: [] }, ...t.sub]);
   const top = rest.findIndex((t) => t.id === targetId);
   if (top >= 0) {
-    if (place === "inside")
-      return rest.map((t) => (t.id === targetId ? { ...t, sub: [...t.sub, ...flat] } : t));
+    if (place === "inside") return rest.map((t) => (t.id === targetId ? { ...t, sub: [...t.sub, ...flat] } : t));
     const i = place === "before" ? top : top + 1;
     return [...rest.slice(0, i), ...moved, ...rest.slice(i)];
   }

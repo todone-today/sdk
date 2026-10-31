@@ -107,3 +107,12 @@ test("a task is late after its time today, or after its day", () => {
   assert.equal(lateBy({ due: "2026-11-01", at: "01:00", done: false }, today, 600), null);
   assert.deepEqual([lateLabel(20), lateLabel(185)], ["20m late", "3h late"]);
 });
+
+test("keeps a priority", () => {
+  const md = "- [ ] Fix the outage ⏫ ⏱ 1h 📅 2026-11-02\n- [ ] Tidy desk 🔽\n";
+  const [a, b] = parse(md);
+  assert.deepEqual([a.title, a.pri, b.title, b.pri], ["Fix the outage", 1, "Tidy desk", 3]);
+  assert.equal(serialize([a, b]), md);
+  assert.ok(validTasks([a, b]));
+  assert.ok(!validTasks([{ ...a, pri: 4 as 1 }]));
+});
