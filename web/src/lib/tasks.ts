@@ -271,8 +271,11 @@ export function tick(tasks: Task[], id: string, today: string): Task[] {
   const walk = (ts: Task[]): Task[] =>
     ts.flatMap((t) => {
       if (t.id !== id) return [{ ...t, sub: walk(t.sub) }];
-      if (t.done || !t.rep) return [{ ...t, done: !t.done }];
-      return [{ ...t, done: true, rep: undefined }, next(t)];
+      // Finishing a task finishes its steps; unticking leaves them as they were.
+      const finish = (t: Task): Task => ({ ...t, done: true, sub: t.sub.map((x) => ({ ...x, done: true })) });
+      if (t.done) return [{ ...t, done: false }];
+      if (!t.rep) return [finish(t)];
+      return [{ ...finish(t), rep: undefined }, next(t)];
     });
   return walk(tasks);
 }

@@ -176,6 +176,20 @@ test("ticking a repeating task makes the next one", () => {
   assert.equal(tick([u], u.id, "2026-10-31")[1].due, "2026-11-01");
 });
 
+test("ticking a task ticks its steps; unticking leaves them", () => {
+  const [t] = parse("- [ ] Launch\n  - [x] Outline\n  - [ ] Ship\n");
+  const [done] = tick([t], t.id, "2026-11-03");
+  assert.deepEqual([done.done, done.sub.map((x) => x.done)], [true, [true, true]]);
+  const [open] = tick([done], t.id, "2026-11-03");
+  assert.deepEqual([open.done, open.sub.map((x) => x.done)], [false, [true, true]]);
+  // A step on its own ticks only itself.
+  assert.deepEqual(
+    tick([t], t.sub[1].id, "2026-11-03")[0].sub.map((x) => x.done),
+    [true, true],
+  );
+  assert.equal(tick([t], t.sub[1].id, "2026-11-03")[0].done, false);
+});
+
 test("demo lists are valid and dated from today", async () => {
   const { demoLists } = await import("./demo.ts");
   const lists = demoLists("2026-10-31");
