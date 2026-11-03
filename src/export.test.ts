@@ -4,7 +4,9 @@ import { toCSV } from "./export.ts";
 import { parse } from "./tasks.ts";
 
 test("CSV has a row per task and step, quoting what needs it", () => {
-  const tasks = parse('- [ ] Plan, then "ship" ⏫ ⏱ 1h 📅 2026-11-02 ⏰ 09:30\n  - [x] Outline\n- [ ] Stretch 🔁 every day\n');
+  const tasks = parse(
+    '- [ ] Plan, then "ship" ⏫ ⏱ 1h 📅 2026-11-02 ⏰ 09:30\n  - [x] Outline\n- [ ] Stretch 🔁 every day\n',
+  );
   const csv = toCSV({
     exportedAt: "2026-11-01T00:00:00Z",
     workspaces: [{ name: "Personal", team: false, lists: [{ name: "Work", ideas: false, tasks }] }],
