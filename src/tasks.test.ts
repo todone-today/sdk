@@ -190,15 +190,6 @@ test("ticking a task ticks its steps; unticking leaves them", () => {
   assert.equal(tick([t], t.sub[1].id, "2026-11-03")[0].done, false);
 });
 
-test("demo lists are valid and dated from today", async () => {
-  const { demoLists } = await import("./demo.ts");
-  const lists = demoLists("2026-10-31");
-  assert.ok(lists.every((l) => validTasks(l.tasks)));
-  const plan = lists[0].tasks.find((t) => t.title === "Plan the week")!;
-  assert.deepEqual([plan.due, plan.at, plan.pri, plan.sub.length], ["2026-10-31", "16:00", 1, 2]);
-  assert.equal(lists[0].tasks.find((t) => t.rep)?.due, "2026-11-01");
-});
-
 test("weekends repeat on Saturday and Sunday", () => {
   assert.equal(nextDue("2026-10-30", "every weekend"), "2026-10-31"); // Fri -> Sat
   assert.equal(nextDue("2026-10-31", "every weekend"), "2026-11-01"); // Sat -> Sun

@@ -1,0 +1,19 @@
+{
+  "name": "@todone/sdk",
+  "version": "0.1.0",
+  "description": "todone's shared logic: the task model and its Markdown format, calendar maths, export, sync planning, integrations and reminders.",
+  "license": "GPL-3.0-only",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "test": "node --test src/*.test.ts",
+    "typecheck": "tsc"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "typescript": "^5"
+  }
+}
