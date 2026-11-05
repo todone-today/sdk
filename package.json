@@ -6,14 +6,26 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./*": "./src/*.ts"
+    "./*": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
+    }
   },
   "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "prepare": "npm run build",
     "test": "node --test src/*.test.ts",
     "typecheck": "tsc"
   },
   "devDependencies": {
     "@types/node": "^20",
     "typescript": "^5"
+  },
+  "files": [
+    "dist"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/todone-today/sdk.git"
   }
 }
