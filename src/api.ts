@@ -18,4 +18,5 @@ export type Share = { token: string; view: CalView; at: string };
 // What a calendar link shows: one shared period (locked) or a workspace's whole calendar.
 export type SharedView = { lists: List[]; start?: { view: CalView; at: string }; locked: boolean };
 
-export type Config = { github: boolean; google: boolean };
+// `verifiesEmail`: the server sends confirmation emails, and unconfirmed accounts are deleted after 7 days.
+export type Config = { github: boolean; google: boolean; verifiesEmail?: boolean };
