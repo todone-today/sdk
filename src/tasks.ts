@@ -296,3 +296,14 @@ export function repeatLabel(rule: string): string {
 
 // A repeating task whose next day hasn't come: it waits out of sight (in Open and the counts) until then.
 export const waiting = (t: Task, today: string) => !t.done && !!t.rep && !!t.due && t.due > today;
+
+// Markdown with "## List name" headings split into lists; tasks before any heading have no list (null).
+export function parseLists(md: string): { name: string | null; tasks: Task[] }[] {
+  const groups: { name: string | null; text: string }[] = [{ name: null, text: "" }];
+  for (const line of md.split("\n")) {
+    const h = /^#{1,3}\s+(.+?)\s*#*\s*$/.exec(line);
+    if (h) groups.push({ name: h[1].trim().slice(0, 60), text: "" });
+    else groups[groups.length - 1].text += line + "\n";
+  }
+  return groups.map((g) => ({ name: g.name, tasks: parse(g.text) })).filter((g) => g.tasks.length);
+}

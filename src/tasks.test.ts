@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   keepIds,
+  parseLists,
   lateBy,
   lateLabel,
   moveTasks,
@@ -200,4 +201,24 @@ test("weekends repeat on Saturday and Sunday", () => {
     "Weekends",
     "Every 2 weeks",
   ]);
+});
+
+test("parseLists splits tasks under headings into lists", () => {
+  const got = parseLists(
+    "- [ ] Loose\n\n## Groceries\n- [ ] Milk\n- [ ] Eggs\n### Work ##\n- [ ] Report\n  - [ ] Charts\n## Empty\n",
+  );
+  assert.deepEqual(
+    got.map((g) => [g.name, g.tasks.map((t) => [t.title, t.sub.length])]),
+    [
+      [null, [["Loose", 0]]],
+      [
+        "Groceries",
+        [
+          ["Milk", 0],
+          ["Eggs", 0],
+        ],
+      ],
+      ["Work", [["Report", 1]]],
+    ],
+  );
 });
