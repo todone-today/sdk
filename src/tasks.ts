@@ -23,6 +23,8 @@ export type List = {
   version: number;
   kind?: "ideas";
   position?: number;
+  // Switched off end-to-end encryption: stored readable, so integrations, feeds and public links can use it.
+  plain?: boolean;
 };
 
 export const uid = () => Math.random().toString(36).slice(2, 10);
