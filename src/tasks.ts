@@ -15,6 +15,9 @@ export type Task = {
   files?: FileRef[]; // attachments; `enc`: stored end-to-end encrypted
   share?: string; // while shared by link (not end-to-end encrypted): the share's id
   history?: Kept[]; // a shared task's conversation, kept (encrypted) after sharing stopped
+  doneAt?: number; // when it was finished (ms)
+  doneBy?: string; // who finished it (user id), for XP in a team
+  goal?: string; // the goal it moves forward (see goals.ts)
   sub: Task[];
 };
 export type FileRef = { id: string; name: string; type: string; size: number; enc?: true };
@@ -28,7 +31,7 @@ export type List = {
   tasks: Task[];
   updated: number;
   version: number;
-  kind?: "ideas" | "bin";
+  kind?: "ideas" | "bin" | "goals";
   position?: number;
   icon?: string; // a name from the app's icon set; inside the encrypted data unless the list is plain
   // Switched off end-to-end encryption: stored readable, so integrations, feeds and public links can use it.
@@ -137,6 +140,9 @@ const fileRef = (f: unknown): f is FileRef => {
 };
 const files = (x: unknown) => x === undefined || (Array.isArray(x) && x.length <= 50 && x.every(fileRef));
 const extras = (t: Record<string, unknown>) =>
+  (t.doneAt === undefined || (typeof t.doneAt === "number" && Number.isFinite(t.doneAt))) &&
+  (t.doneBy === undefined || str(t.doneBy, 80)) &&
+  (t.goal === undefined || (typeof t.goal === "string" && ID.test(t.goal))) &&
   (t.note === undefined || (typeof t.note === "string" && t.note.length <= 20_000)) &&
   files(t.files) &&
   (t.share === undefined || (typeof t.share === "string" && ID.test(t.share))) &&
@@ -304,11 +310,13 @@ export function nextDue(from: string, rule: string): string {
 
 // Ticks a task (or unticks it). Finishing a repeating task keeps it done and adds the next one right after it,
 // due on the next day of its rule, with its steps unticked; the finished one stops repeating.
-export function tick(tasks: Task[], id: string, today: string): Task[] {
+export function tick(tasks: Task[], id: string, today: string, by?: string): Task[] {
   const next = (t: Task): Task => ({
     ...t,
     id: uid(),
     done: false,
+    doneAt: undefined,
+    doneBy: undefined,
     spent: undefined,
     due: nextDue(t.due ?? today, t.rep!),
     sub: t.sub.map((x) => ({ ...x, id: uid(), done: false, spent: undefined })),
@@ -317,8 +325,15 @@ export function tick(tasks: Task[], id: string, today: string): Task[] {
     ts.flatMap((t) => {
       if (t.id !== id) return [{ ...t, sub: walk(t.sub) }];
       // Finishing a task finishes its steps; unticking leaves them as they were.
-      const finish = (t: Task): Task => ({ ...t, done: true, sub: t.sub.map((x) => ({ ...x, done: true })) });
-      if (t.done) return [{ ...t, done: false }];
+      const at = Date.now();
+      const finish = (t: Task): Task => ({
+        ...t,
+        done: true,
+        doneAt: at,
+        ...(by ? { doneBy: by } : {}),
+        sub: t.sub.map((x) => ({ ...x, done: true })),
+      });
+      if (t.done) return [{ ...t, done: false, doneAt: undefined, doneBy: undefined }];
       if (!t.rep) return [finish(t)];
       return [{ ...finish(t), rep: undefined }, next(t)];
     });
