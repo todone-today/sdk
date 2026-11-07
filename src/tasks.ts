@@ -14,14 +14,15 @@ export type Task = {
   sub: Task[];
 };
 
-// kind "ideas" is the workspace's brainstorm board; it is stored like a list but kept out of lists and the calendar.
+// kind "ideas" is the workspace's brainstorm board, kind "bin" its recently deleted tasks (kept 7 days); both are
+// stored like lists but kept out of lists and the calendar.
 export type List = {
   id: string;
   name: string;
   tasks: Task[];
   updated: number;
   version: number;
-  kind?: "ideas";
+  kind?: "ideas" | "bin";
   position?: number;
   // Switched off end-to-end encryption: stored readable, so integrations, feeds and public links can use it.
   plain?: boolean;
