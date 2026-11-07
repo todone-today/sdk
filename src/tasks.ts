@@ -11,8 +11,14 @@ export type Task = {
   spent?: number; // minutes in focus
   pri?: 1 | 2 | 3; // priority: 1 high, 2 medium, 3 low (Obsidian Tasks: ⏫ 🔼 🔽)
   rep?: string; // repeats: "every day", "every weekday", "every 2 weeks", ... (Obsidian Tasks: 🔁)
+  note?: string; // the description, simple Markdown
+  files?: FileRef[]; // attachments; `enc`: stored end-to-end encrypted
+  share?: string; // while shared by link (not end-to-end encrypted): the share's id
+  history?: Kept[]; // a shared task's conversation, kept (encrypted) after sharing stopped
   sub: Task[];
 };
+export type FileRef = { id: string; name: string; type: string; size: number; enc?: true };
+export type Kept = { who: string; at: number; text: string; files?: FileRef[] };
 
 // kind "ideas" is the workspace's brainstorm board, kind "bin" its recently deleted tasks (kept 7 days); both are
 // stored like lists but kept out of lists and the calendar.
@@ -113,6 +119,39 @@ export const todayISO = () => {
 };
 
 const str = (x: unknown, max: number) => typeof x === "string" && x.trim() !== "" && x.length <= max;
+const ID = /^[\w-]{8,64}$/;
+const fileRef = (f: unknown): f is FileRef => {
+  const r = f as FileRef;
+  return (
+    !!r &&
+    typeof r === "object" &&
+    ID.test(String(r.id)) &&
+    str(r.name, 200) &&
+    str(r.type, 100) &&
+    Number.isInteger(r.size) &&
+    r.size > 0 &&
+    r.size <= 60_000_000 &&
+    (r.enc === undefined || r.enc === true)
+  );
+};
+const files = (x: unknown) => x === undefined || (Array.isArray(x) && x.length <= 50 && x.every(fileRef));
+const extras = (t: Record<string, unknown>) =>
+  (t.note === undefined || (typeof t.note === "string" && t.note.length <= 20_000)) &&
+  files(t.files) &&
+  (t.share === undefined || (typeof t.share === "string" && ID.test(t.share))) &&
+  (t.history === undefined ||
+    (Array.isArray(t.history) &&
+      t.history.length <= 500 &&
+      t.history.every(
+        (h) =>
+          !!h &&
+          typeof h === "object" &&
+          str(h.who, 80) &&
+          Number.isFinite(h.at) &&
+          typeof h.text === "string" &&
+          h.text.length <= 4000 &&
+          files(h.files),
+      )));
 const mins = (x: unknown) => x === undefined || (Number.isInteger(x) && (x as number) >= 0 && (x as number) < 1e6);
 
 // Checks tasks sent by a browser before they are stored: the shape above, one level of subtasks.
@@ -133,6 +172,7 @@ export function validTasks(x: unknown, depth = 0): x is Task[] {
         (t.pri === undefined || t.pri === 1 || t.pri === 2 || t.pri === 3) &&
         (t.rep === undefined || (typeof t.rep === "string" && validRepeat(t.rep))) &&
         mins(t.spent) &&
+        extras(t) &&
         (depth ? Array.isArray(t.sub) && t.sub.length === 0 : validTasks(t.sub, 1)),
     )
   );

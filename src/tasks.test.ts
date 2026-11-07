@@ -222,3 +222,14 @@ test("parseLists splits tasks under headings into lists", () => {
     ],
   );
 });
+
+test("tasks carry a description, attachments, a share id and kept history, within limits", () => {
+  const base = { id: "t1", title: "a", done: false, sub: [] };
+  const file = { id: "file-12345678", name: "photo.jpg", type: "image/jpeg", size: 2048, enc: true as const };
+  assert.ok(validTasks([{ ...base, note: "**hi**", files: [file], share: "share-123456", history: [{ who: "Guest 1", at: 1, text: "hey", files: [file] }] }]));
+  assert.ok(!validTasks([{ ...base, note: "x".repeat(20_001) }]));
+  assert.ok(!validTasks([{ ...base, files: [{ ...file, size: 0 }] }]));
+  assert.ok(!validTasks([{ ...base, files: [{ ...file, id: "../etc" }] }]));
+  assert.ok(!validTasks([{ ...base, share: "x" }]));
+  assert.ok(!validTasks([{ ...base, history: [{ who: "", at: 1, text: "" }] }]));
+});
