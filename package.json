@@ -1,6 +1,6 @@
 {
   "name": "@todone/sdk",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "todone's shared logic: the task model and its Markdown format, calendar maths, export, sync planning, integrations, reminders and end-to-end encryption.",
   "license": "GPL-3.0-only",
   "private": true,

@@ -169,7 +169,7 @@ export async function newRecovery(accountKey: CryptoKey) {
 export const readRecovery = async (accountKey: CryptoKey, blob: string) => dec.decode(await open(accountKey, blob));
 
 // Lists: name and tasks together in one blob, bound to the list's id.
-export const encryptList = (key: CryptoKey, id: string, list: { name: string; tasks: unknown }) =>
-  sealJSON(key, { name: list.name, tasks: list.tasks }, `list:${id}`);
+export const encryptList = (key: CryptoKey, id: string, list: { name: string; tasks: unknown; icon?: string }) =>
+  sealJSON(key, { name: list.name, tasks: list.tasks, ...(list.icon ? { icon: list.icon } : {}) }, `list:${id}`);
 export const decryptList = <T>(key: CryptoKey, id: string, blob: string) =>
-  openJSON<{ name: string; tasks: T }>(key, blob, `list:${id}`);
+  openJSON<{ name: string; tasks: T; icon?: string }>(key, blob, `list:${id}`);

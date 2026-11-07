@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   keepIds,
+  validIcon,
   parseLists,
   lateBy,
   lateLabel,
@@ -232,4 +233,9 @@ test("tasks carry a description, attachments, a share id and kept history, withi
   assert.ok(!validTasks([{ ...base, files: [{ ...file, id: "../etc" }] }]));
   assert.ok(!validTasks([{ ...base, share: "x" }]));
   assert.ok(!validTasks([{ ...base, history: [{ who: "", at: 1, text: "" }] }]));
+});
+
+test("validIcon takes icon names only", () => {
+  assert.ok(validIcon(undefined) && validIcon("shopping-cart") && validIcon("star"));
+  assert.ok(!validIcon("<svg>") && !validIcon("x".repeat(40)) && !validIcon(3));
 });

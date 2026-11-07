@@ -30,6 +30,7 @@ export type List = {
   version: number;
   kind?: "ideas" | "bin";
   position?: number;
+  icon?: string; // a name from the app's icon set; inside the encrypted data unless the list is plain
   // Switched off end-to-end encryption: stored readable, so integrations, feeds and public links can use it.
   plain?: boolean;
 };
@@ -179,6 +180,7 @@ export function validTasks(x: unknown, depth = 0): x is Task[] {
 }
 
 export const validName = (x: unknown): x is string => str(x, 60);
+export const validIcon = (x: unknown) => x === undefined || x === null || (typeof x === "string" && /^[a-z0-9-]{1,32}$/.test(x));
 
 // Markdown carries no ids: tasks that come back with the same title keep the id they had, so links to synced items hold.
 export function keepIds(before: Task[], after: Task[]): Task[] {
