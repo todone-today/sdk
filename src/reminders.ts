@@ -3,7 +3,7 @@
 import type { Task } from "./tasks.ts";
 
 export type Note = { key: string; title: string; body: string };
-type Item = { task: Task; list: string };
+export type Item = { task: Task; list: string };
 
 export const DIGEST_AT = 8 * 60; // the morning summary, 08:00 local
 const toMin = (at: string) => +at.slice(0, 2) * 60 + +at.slice(3, 5);
