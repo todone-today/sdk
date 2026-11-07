@@ -239,3 +239,12 @@ test("validIcon takes icon names only", () => {
   assert.ok(validIcon(undefined) && validIcon("shopping-cart") && validIcon("star"));
   assert.ok(!validIcon("<svg>") && !validIcon("x".repeat(40)) && !validIcon(3));
 });
+
+test("effort: a size from XS to XL, in Markdown as 💪", () => {
+  const [t] = parse("- [ ] Move house 💪 XL ⏱ 4h");
+  assert.equal(t.effort, "xl");
+  assert.equal(t.title, "Move house");
+  assert.match(serialize([t]), /💪 xl/);
+  assert.ok(validTasks([t]));
+  assert.ok(!validTasks([{ ...t, effort: "huge" as never }]));
+});

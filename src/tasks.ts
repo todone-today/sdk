@@ -10,6 +10,7 @@ export type Task = {
   est?: number; // minutes
   spent?: number; // minutes in focus
   pri?: 1 | 2 | 3; // priority: 1 high, 2 medium, 3 low (Obsidian Tasks: ⏫ 🔼 🔽)
+  effort?: Effort; // how hard it is, apart from how long: "xs" to "xl" (Markdown: 💪 m)
   rep?: string; // repeats: "every day", "every weekday", "every 2 weeks", ... (Obsidian Tasks: 🔁)
   note?: string; // the description, simple Markdown
   files?: FileRef[]; // attachments; `enc`: stored end-to-end encrypted
@@ -20,6 +21,8 @@ export type Task = {
   goal?: string; // the goal it moves forward (see goals.ts)
   sub: Task[];
 };
+export const EFFORTS = ["xs", "s", "m", "l", "xl"] as const;
+export type Effort = (typeof EFFORTS)[number];
 export type FileRef = { id: string; name: string; type: string; size: number; enc?: true };
 export type Kept = { who: string; at: number; text: string; files?: FileRef[] };
 
@@ -67,6 +70,7 @@ function meta(text: string): Omit<Task, "id" | "done" | "sub"> {
     validRepeat(r.trim()) ? ((t.rep = r.trim().toLowerCase()), "") : m,
   );
   s = s.replace(/ ?📅 (\d{4}-\d{2}-\d{2})/u, (_, d) => ((t.due = d), ""));
+  s = s.replace(/ ?💪 ?(xs|xl|s|m|l)\b/iu, (_, e) => ((t.effort = e.toLowerCase() as Effort), ""));
   s = s.replace(/ ?(⏫|🔼|🔽)/u, (_, p) => ((t.pri = (PRI_MARK.indexOf(p) + 1) as 1 | 2 | 3), ""));
   // "9:30" or "09:30"; anything past 23:59 is left in the title.
   s = s.replace(/ ?⏰ ([01]?\d|2[0-3]):([0-5]\d)/u, (_, h, m) => ((t.at = `${h.padStart(2, "0")}:${m}`), ""));
@@ -93,6 +97,7 @@ export function parse(md: string): Task[] {
 function line(t: Task, indent: string): string {
   const fields =
     (t.pri ? ` ${PRI_MARK[t.pri - 1]}` : "") +
+    (t.effort ? ` 💪 ${t.effort}` : "") +
     (t.rep ? ` 🔁 ${t.rep}` : "") +
     (t.est ? ` ⏱ ${fmtMinutes(t.est)}` : "") +
     (t.due ? ` 📅 ${t.due}` : "") +
@@ -140,6 +145,7 @@ const fileRef = (f: unknown): f is FileRef => {
 };
 const files = (x: unknown) => x === undefined || (Array.isArray(x) && x.length <= 50 && x.every(fileRef));
 const extras = (t: Record<string, unknown>) =>
+  (t.effort === undefined || (EFFORTS as readonly unknown[]).includes(t.effort)) &&
   (t.doneAt === undefined || (typeof t.doneAt === "number" && Number.isFinite(t.doneAt))) &&
   (t.doneBy === undefined || str(t.doneBy, 80)) &&
   (t.goal === undefined || (typeof t.goal === "string" && ID.test(t.goal))) &&

@@ -118,3 +118,9 @@ test("habit check-ins count toward the week once, not again for their XP", () =>
   const items = logGoal(logGoal([], g, 1, +new Date(2026, 10, 10, 7), id), g, 1, +new Date(2026, 10, 11, 7), id);
   assert.equal(goalProgress(g, [], items, now).thisWeek, 2);
 });
+
+test("effort adds to a task's XP", () => {
+  const base: Task = { id: "task0099", title: "x", done: true, sub: [] };
+  assert.equal(xpFor({ ...base, effort: "xl" }, "2026-11-01").xp - xpFor(base, "2026-11-01").xp, 15);
+  assert.equal(xpFor({ ...base, effort: "m" }, "2026-11-01").size, 6);
+});

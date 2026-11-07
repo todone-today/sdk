@@ -106,16 +106,21 @@ export function validGoalItems(x: unknown): x is GoalItem[] {
   return goals <= 100 && rewards <= 50;
 }
 
-// XP for finishing a task: effort, urgency and keeping your word, all from what the task already says.
-// 5, + estimate / 5 (up to 4 h), + 6 high / 3 medium priority, + 4 on time, + 2 a step (up to 10), + 5 toward a goal.
+// XP for a task's effort size: XS nothing extra, then S 3, M 6, L 10, XL 15.
+export const EFFORT_XP = { xs: 0, s: 3, m: 6, l: 10, xl: 15 } as const;
+
+// XP for finishing a task: time, effort, urgency and keeping your word, all from what the task already says.
+// 5, + estimate / 5 (up to 4 h), + its effort size (EFFORT_XP), + 6 high / 3 medium priority, + 4 on time,
+// + 2 a step (up to 10), + 5 toward a goal.
 // Honest by design: a bigger estimate earns more, and that's the person's call.
 export function xpFor(task: Task, doneDay: string) {
   const effort = Math.round(Math.min(task.est ?? 0, 240) / 5);
+  const size = task.effort ? EFFORT_XP[task.effort] : 0;
   const urgency = task.pri === 1 ? 6 : task.pri === 2 ? 3 : 0;
   const onTime = task.due && doneDay <= task.due ? 4 : 0;
   const steps = Math.min(task.sub.length * 2, 10);
   const goal = task.goal ? 5 : 0;
-  return { xp: 5 + effort + urgency + onTime + steps + goal, effort, urgency, onTime, steps, goal };
+  return { xp: 5 + effort + size + urgency + onTime + steps + goal, effort, size, urgency, onTime, steps, goal };
 }
 
 // Someone's XP to spend (or everyone's, without `by`).
