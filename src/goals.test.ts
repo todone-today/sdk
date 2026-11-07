@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { balance, fold, goalProgress, reconcile, validGoalItems, xpFor, type Goal, type GoalItem } from "./goals.ts";
+import { balance, fold, goalProgress, logGoal, reconcile, validGoalItems, xpFor, type Goal, type GoalItem } from "./goals.ts";
 import { tick, type Task } from "./tasks.ts";
 
 const task = (o: Partial<Task> = {}): Task => ({ id: "task0001", title: "T", done: false, sub: [], ...o });
@@ -78,4 +78,43 @@ test("fold keeps the log under its cap without losing XP", () => {
   const f = fold(items, () => `c${String(n++).padStart(8, "0")}`);
   assert.ok(f.length < 5000);
   assert.equal(balance(f, "u1"), 10400);
+});
+
+test("target goals: progress from start to target, in either direction", () => {
+  const g: Goal = { t: "goal", id: "goal0009", title: "Weigh 68 kg", kind: "target", unit: "kg", start: 74, target: 68, created: 0 };
+  let n = 0;
+  const id = () => `id${String(++n).padStart(6, "0")}`;
+  const now = new Date(2026, 10, 9, 12);
+  let items: GoalItem[] = logGoal([], g, 71, +now, id, "me");
+  const p = goalProgress(g, [], items, now);
+  assert.equal(p.current, 71);
+  assert.equal(p.towards, 0.5);
+  assert.equal(balance(items, "me"), 3); // first log of the day earns 3
+  items = logGoal(items, g, 70.5, +now + 1000, id, "me");
+  assert.equal(balance(items, "me"), 3); // the second that day earns nothing
+  assert.ok(validGoalItems([g, ...items]));
+});
+
+test("daily goals: today's total, the bonus once on reaching it, and days hit this week", () => {
+  const g: Goal = { t: "goal", id: "goal0010", title: "protein", kind: "daily", unit: "g", target: 140, created: 0 };
+  let n = 0;
+  const id = () => `id${String(++n).padStart(6, "0")}`;
+  const now = new Date(2026, 10, 11, 20); // a Wednesday
+  let items: GoalItem[] = logGoal([], g, 140, +new Date(2026, 10, 9, 9), id); // Monday: hit
+  items = logGoal(items, g, 60, +new Date(2026, 10, 11, 9), id);
+  items = logGoal(items, g, 90, +new Date(2026, 10, 11, 13), id); // reaches 150
+  items = logGoal(items, g, 20, +new Date(2026, 10, 11, 19), id); // past it: no second bonus
+  const p = goalProgress(g, [], items, now);
+  assert.equal(p.today, 170);
+  assert.equal(p.daysHit, 2);
+  assert.equal(balance(items), 3 + 10 + 3 + 10);
+});
+
+test("habit check-ins count toward the week once, not again for their XP", () => {
+  const g: Goal = { t: "goal", id: "goal0011", title: "Gym", kind: "habit", perWeek: 5, created: 0 };
+  let n = 0;
+  const id = () => `id${String(++n).padStart(6, "0")}`;
+  const now = new Date(2026, 10, 11, 20);
+  const items = logGoal(logGoal([], g, 1, +new Date(2026, 10, 10, 7), id), g, 1, +new Date(2026, 10, 11, 7), id);
+  assert.equal(goalProgress(g, [], items, now).thisWeek, 2);
 });
