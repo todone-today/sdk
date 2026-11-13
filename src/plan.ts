@@ -276,8 +276,9 @@ ${
   effort. Only touch the lists I shared, and only what I asked about: no new goals or rewards unless I ask. New
   tasks still go under "## List name".`
       : `- If what I ask needs the tasks already in one of my lists (clean up, sort, review, finish, delete, move or
-  reschedule what's there), reply with only "## Needs" and that list's name on a "- " line (up to 3), and nothing
-  else: I'll be asked to share it, then you'll get its tasks.`
+  reschedule what's there), reply with only "## Needs" and that list's name on a "- " line, and nothing else: I'll be
+  asked to share it, then you'll get its tasks. Name only the lists I mean, usually one${c.here ? ` ("this list" is "${c.here}")` : ""}; more
+  (up to 3) only when I clearly ask about several or all of them.`
   }
 - No other headings, numbers, notes or code fences.
 ${(c.open ?? []).map((l) => `\nWhat's in "${l.name}" now:\n${l.md}\n`).join("")}

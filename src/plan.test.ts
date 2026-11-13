@@ -118,3 +118,7 @@ test("planPrompt says which list is open, so \"this list\" means it", () => {
   assert.match(planPrompt({ today: "2026-11-14", weekday: "Saturday", lists: ["Todone"], here: "Todone" }), /I'm looking at my list "Todone"/);
   assert.doesNotMatch(planPrompt({ today: "2026-11-14", weekday: "Saturday", lists: ["Todone"] }), /I'm looking at/);
 });
+
+test("planPrompt asks for only the lists meant; \"this list\" is the open one", () => {
+  assert.match(planPrompt({ today: "2026-11-14", weekday: "Saturday", lists: ["Groceries", "Work"], here: "Groceries" }), /"this list" is "Groceries"/);
+});
