@@ -13,17 +13,77 @@
 //   - Movie night | 300 XP
 //   ## Questions
 //   - When is the client demo?
+//
+// To work with tasks someone already has, the AI first names the lists it needs (## Needs); once they agree, the app
+// sends those lists, each task numbered ([#3]), and the answer can change them:
+//
+//   ## Changes
+//   - done #3
+//   - delete #5
+//   - move #4 → Work
+//   - edit #2 | Call Rahul about the homepage ⏫ 📅 2026-11-14
 import { EFFORT_XP, validGoalItems, type Goal, type Reward } from "./goals.ts";
-import { parseLists, type Task } from "./tasks.ts";
+import { parseLists, serialize, type Task } from "./tasks.ts";
 
 // A goal as suggested: `listName` is the list it goes with, by name (the app links it once the list exists).
 export type PlanGoal = Omit<Goal, "list"> & { listName?: string };
-// `questions`: what the AI needs to know to do better; it still suggests what it can.
-export type Plan = { lists: { name: string | null; tasks: Task[] }[]; goals: PlanGoal[]; rewards: Reward[]; questions: string[] };
+// A change to a task someone already has, by its number in what was sent. `edit` carries the fields to set.
+export type Change = { ref: number; why?: string } & (
+  | { op: "done" }
+  | { op: "delete" }
+  | { op: "move"; to: string }
+  | { op: "edit"; set: Partial<Pick<Task, "title" | "due" | "at" | "est" | "pri" | "effort">> }
+);
+// `questions`: what the AI needs to know to do better; it still suggests what it can. `needs`: lists it must read
+// first (by name); `changes`: to tasks in lists it was given.
+export type Plan = {
+  lists: { name: string | null; tasks: Task[] }[];
+  goals: PlanGoal[];
+  rewards: Reward[];
+  questions: string[];
+  needs: string[];
+  changes: Change[];
+};
+export type OpenList = { name: string; md: string }; // a list the person let the AI read, numbered (see numbered())
 
 const GOALS = /^goals?$/i;
 const REWARDS = /^rewards?$/i;
 const QUESTIONS = /^questions?$/i;
+const NEEDS = /^needs?$/i;
+const CHANGES = /^changes?$/i;
+
+// One "- delete #3" line as a change; anything else is dropped.
+function changeLine(line: string): Change | null {
+  const m = /^\s*-\s*(done|delete|move|edit)\s+#(\d+)\s*(.*)$/i.exec(line);
+  if (!m) return null;
+  const op = m[1].toLowerCase(), ref = +m[2], rest = m[3].trim();
+  if (op === "done" || op === "delete") return { ref, op } as Change;
+  if (op === "move") {
+    const to = rest.replace(/^(→|->|to)\s*/i, "").trim().slice(0, 60);
+    return to ? { ref, op, to } : null;
+  }
+  const t = parseLists(`- [ ] ${rest.replace(/^\|\s*/, "")}`)[0]?.tasks[0];
+  if (!t) return null;
+  const set: Extract<Change, { op: "edit" }>["set"] = {};
+  if (t.title) set.title = t.title.slice(0, 300);
+  for (const k of ["due", "at", "est", "pri", "effort"] as const) if (t[k] !== undefined) (set as Record<string, unknown>)[k] = t[k];
+  return Object.keys(set).length ? { ref, op: "edit", set } : null;
+}
+
+// Tasks as sent to the AI to work with: the usual Markdown, each line numbered ([#n]), notes as "> " lines. `refs[n]`
+// is the task's id. Numbers carry on across lists (pass `from`).
+export function numbered(tasks: Task[], from = 1) {
+  const refs: Record<number, string> = {};
+  let n = from;
+  const line = (t: Task, indent: string) => {
+    refs[n] = t.id;
+    const out = [`${indent}${serialize([{ ...t, sub: [] }]).trim()} [#${n++}]`];
+    if (t.note) out.push(`${indent}  > ${t.note.replace(/\s+/g, " ").slice(0, 400)}`);
+    return out;
+  };
+  const md = tasks.flatMap((t) => [...line(t, ""), ...t.sub.flatMap((u) => line(u, "  "))]).join("\n");
+  return { md, refs, next: n };
+}
 const TASK = /^\s*- \[[ xX]\] /;
 const WHY = /^\s*>\s*(.+)$/;
 
@@ -105,11 +165,21 @@ export function parsePlan(md: string, id: () => string, now = Date.now()): Plan 
   const goals: PlanGoal[] = [];
   const rewards: Reward[] = [];
   const questions: string[] = [];
+  const needs: string[] = [];
+  const changes: Change[] = [];
   let tasks = "";
   for (const s of sections) {
     const lines = s.text.split("\n").filter((l) => /^\s*-\s+\S/.test(l));
     if (s.name && GOALS.test(s.name)) for (const l of lines) goals.push(...[goalLine(l, id(), now)].filter((g) => g !== null));
     else if (s.name && REWARDS.test(s.name)) for (const l of lines) rewards.push(...[rewardLine(l, id())].filter((r) => r !== null));
+    else if (s.name && NEEDS.test(s.name)) for (const l of lines) needs.push(l.replace(/^\s*-\s*/, "").trim().slice(0, 60));
+    else if (s.name && CHANGES.test(s.name))
+      for (const l of s.text.split("\n")) {
+        const w = WHY.exec(l);
+        const last = changes[changes.length - 1];
+        if (w && last && !last.why) last.why = w[1].trim().slice(0, 200);
+        else if (!w) changes.push(...[changeLine(l)].filter((c) => c !== null));
+      }
     else if (s.name && QUESTIONS.test(s.name))
       for (const l of lines) questions.push(l.replace(/^\s*-\s*(\[[ xX]\]\s*)?/, "").trim().slice(0, 200));
     else tasks += (s.name ? `## ${s.name}\n` : "") + s.text;
@@ -121,6 +191,8 @@ export function parsePlan(md: string, id: () => string, now = Date.now()): Plan 
     goals: goals.filter(ok).slice(0, 20),
     rewards: rewards.filter(ok).slice(0, 20),
     questions: questions.filter(Boolean).slice(0, 3),
+    needs: needs.filter(Boolean).slice(0, 3),
+    changes: changes.slice(0, 200),
   };
 }
 
@@ -131,6 +203,7 @@ export function planPrompt(c: {
   lists: string[];
   goals?: string[];
   rewards?: string[];
+  open?: OpenList[]; // lists the person let it read, to change
 }) {
   const xp = Object.values(EFFORT_XP).join("/");
   return `You plan my work. Read what I describe below (it may be typed or spoken, in English, Hindi or Hinglish), work
@@ -175,7 +248,7 @@ Where things go:
     c.lists.length
       ? `My lists are: ${c.lists.join(", ")}. Use one of those names exactly when a task fits it; otherwise make a short new list name.`
       : "Make short list names that group the tasks sensibly."
-  } Never name a list "Goals", "Rewards" or "Questions".
+  } Never name a list "Goals", "Rewards", "Questions", "Needs" or "Changes".
 - "## Goals" only for something I want to keep at or reach over time, never a one-off task (that stays a task) or a
   treat (that's a reward). Each thing I said goes in one place only. A goal is one of: habit (how many days a week,
   1–7), outcome (something to finish, optionally by a date), target (a number to get from → to, with a unit), daily
@@ -189,8 +262,22 @@ Where things go:
 - "## Questions": up to 3, only when an answer would really change the tasks (a deadline I mentioned without a date,
   who something is for, which of two things I meant). Still give your best tasks for everything else. If what I said
   is too vague to plan at all, reply with only Questions.
+${
+    c.open?.length
+      ? `- I've shared what's in ${c.open.map((l) => `"${l.name}"`).join(", ")} below; each task has a number like [#3]. To
+  change those tasks, add "## Changes", one per line: "- done #3", "- delete #3", "- move #3 → List name" (one of my
+  lists, or a new name), or "- edit #3 | New title ⏫ ⏱ 30m 💪 s 📅 2026-11-14 ⏰ 09:30" (only the parts that change,
+  title first if it changes). Under each, a "  > " line says why in under 12 words. Do the work yourself
+  with Changes: never add a task like "Review the list" or "Clean up X". "Clean up" means delete what's done or no
+  longer needed, merge duplicates (keep one, delete the rest), fix unclear titles, and add missing priority, time and
+  effort. Only touch the lists I shared, and only what I asked about: no new goals or rewards unless I ask. New
+  tasks still go under "## List name".`
+      : `- If what I ask needs the tasks already in one of my lists (clean up, sort, review, finish, delete, move or
+  reschedule what's there), reply with only "## Needs" and that list's name on a "- " line (up to 3), and nothing
+  else: I'll be asked to share it, then you'll get its tasks.`
+  }
 - No other headings, numbers, notes or code fences.
-
+${(c.open ?? []).map((l) => `\nWhat's in "${l.name}" now:\n${l.md}\n`).join("")}
 Here's what I need:
 `;
 }

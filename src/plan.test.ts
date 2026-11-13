@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parsePlan, planPrompt } from "./plan.ts";
+import { numbered, parsePlan, planPrompt } from "./plan.ts";
 
 let n = 0;
 const id = () => `id${String(++n).padStart(6, "0")}`;
@@ -80,5 +80,36 @@ test("parsePlan: a task's \"> why\" line becomes its note (steps too); Questions
   assert.equal(call.sub[0].note, "Lost it.");
   assert.equal(plain.note, undefined);
   assert.deepEqual(p.questions, ["When is the demo?", "Which client?", "A?"]);
-  assert.deepEqual(parsePlan("## Questions\n- What do you mean?\n", id), { lists: [], goals: [], rewards: [], questions: ["What do you mean?"] });
+  assert.deepEqual(parsePlan("## Questions\n- What do you mean?\n", id).questions, ["What do you mean?"]);
+});
+
+test("parsePlan: Needs names lists to read; Changes act on numbered tasks, with a reason each", () => {
+  assert.deepEqual(parsePlan("## Needs\n- Personal\n", id).needs, ["Personal"]);
+  const p = parsePlan(
+    "## Changes\n- done #3\n  > Finished last week.\n- delete #5\n- move #4 → Work\n- edit #2 | Call Rahul ⏫ 📅 2026-11-14\n- edit #9 | 📅 2026-11-20\n- explode #1\n- delete 7\n## Work\n- [ ] New one\n",
+    id,
+  );
+  assert.deepEqual(p.changes, [
+    { ref: 3, op: "done", why: "Finished last week." },
+    { ref: 5, op: "delete" },
+    { ref: 4, op: "move", to: "Work" },
+    { ref: 2, op: "edit", set: { title: "Call Rahul", due: "2026-11-14", pri: 1 } },
+    { ref: 9, op: "edit", set: { due: "2026-11-20" } },
+  ]);
+  assert.equal(p.lists[0].tasks[0].title, "New one");
+});
+
+test("numbered: each task and step gets a number, notes go along, and planPrompt includes the lists", () => {
+  const tasks = [
+    { id: "a", title: "Pack", done: false, note: "for Goa\nlight", sub: [{ id: "b", title: "Chargers", done: true, sub: [] }] },
+    { id: "c", title: "Book hotel", done: false, due: "2026-12-01", sub: [] },
+  ];
+  const { md, refs, next } = numbered(tasks, 4);
+  assert.equal(md, "- [ ] Pack [#4]\n  > for Goa light\n  - [x] Chargers [#5]\n- [ ] Book hotel 📅 2026-12-01 [#6]");
+  assert.deepEqual([refs, next], [{ 4: "a", 5: "b", 6: "c" }, 7]);
+  const s = planPrompt({ today: "2026-11-13", weekday: "Friday", lists: ["Trip"], open: [{ name: "Trip", md }] });
+  assert.match(s, /What's in "Trip" now:\n- \[ \] Pack \[#4\]/);
+  assert.match(s, /## Changes/);
+  assert.doesNotMatch(s, /reply with only "## Needs"/);
+  assert.match(planPrompt({ today: "2026-11-13", weekday: "Friday", lists: ["Trip"] }), /reply with only "## Needs"/);
 });
