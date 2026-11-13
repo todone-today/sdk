@@ -69,3 +69,16 @@ test("planPrompt names the lists, goals and rewards it should match, and today's
   assert.match(s, /don't repeat them\): Read/);
   assert.match(s, /Never name a list "Goals"/);
 });
+
+test("parsePlan: a task's \"> why\" line becomes its note (steps too); Questions are kept, up to 3", () => {
+  const p = parsePlan(
+    "## Work\n- [ ] Call Rahul ⏫ ⏱ 15m 💪 xs\n  > He signs off the homepage.\n  - [ ] Find his number\n    > Lost it.\n- [ ] Plain one\n## Questions\n- When is the demo?\n- Which client?\n- A?\n- B?\n",
+    id,
+  );
+  const [call, plain] = p.lists[0].tasks;
+  assert.deepEqual([call.note, call.pri, call.est, call.effort], ["He signs off the homepage.", 1, 15, "xs"]);
+  assert.equal(call.sub[0].note, "Lost it.");
+  assert.equal(plain.note, undefined);
+  assert.deepEqual(p.questions, ["When is the demo?", "Which client?", "A?"]);
+  assert.deepEqual(parsePlan("## Questions\n- What do you mean?\n", id), { lists: [], goals: [], rewards: [], questions: ["What do you mean?"] });
+});
