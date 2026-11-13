@@ -204,6 +204,7 @@ export function planPrompt(c: {
   goals?: string[];
   rewards?: string[];
   open?: OpenList[]; // lists the person let it read, to change
+  here?: string; // the list they have open
 }) {
   const xp = Object.values(EFFORT_XP).join("/");
   return `You plan my work. Read what I describe below (typed or spoken, in any language or a mix, like Hinglish), work
@@ -243,7 +244,9 @@ Details on each task (give your best judgement; I can change them later):
 - ⏰ a start time, 24-hour HH:MM, only if I gave a time.
 - Write "- [x]" for anything I said is already done.
 
-Where things go:
+${c.here ? `I'm looking at my list "${c.here}": "this list", "here" or "it" means that one, and tasks with no clear list go there.
+
+` : ""}Where things go:
 - Put each task under a "## List name" line. ${
     c.lists.length
       ? `My lists are: ${c.lists.join(", ")}. Use one of those names exactly when a task fits it; otherwise make a short new list name.`

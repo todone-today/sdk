@@ -113,3 +113,8 @@ test("numbered: each task and step gets a number, notes go along, and planPrompt
   assert.doesNotMatch(s, /reply with only "## Needs"/);
   assert.match(planPrompt({ today: "2026-11-13", weekday: "Friday", lists: ["Trip"] }), /reply with only "## Needs"/);
 });
+
+test("planPrompt says which list is open, so \"this list\" means it", () => {
+  assert.match(planPrompt({ today: "2026-11-14", weekday: "Saturday", lists: ["Todone"], here: "Todone" }), /I'm looking at my list "Todone"/);
+  assert.doesNotMatch(planPrompt({ today: "2026-11-14", weekday: "Saturday", lists: ["Todone"] }), /I'm looking at/);
+});
