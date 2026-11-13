@@ -206,7 +206,7 @@ export function planPrompt(c: {
   open?: OpenList[]; // lists the person let it read, to change
 }) {
   const xp = Object.values(EFFORT_XP).join("/");
-  return `You plan my work. Read what I describe below (it may be typed or spoken, in English, Hindi or Hinglish), work
+  return `You plan my work. Read what I describe below (typed or spoken, in any language or a mix, like Hinglish), work
 out what I actually need to do, and turn it into todone: todo lists, plus goals and rewards when they fit. Reply with
 only this format:
 
@@ -229,7 +229,7 @@ How to think:
   with a verb ("Call Rahul about the homepage", not "Rahul homepage"). Split a big or vague thing into a task with 2–5
   steps, and add a step I'd obviously need first (to book a trip: compare flights, book the hotel). Merge duplicates.
   Don't pad: no tasks I didn't ask for or clearly need.
-- Write every title, step, reason and question in plain, natural English, even when I spoke Hindi or Hinglish.
+- Write every title, step, reason and question in plain, natural English, whatever language I used.
   Translate the meaning, not word for word; keep names of people, places and things as they are.
 - Under each task, a "> " line gives the reason in under 15 words. Leave it out when the reason is obvious.
 
