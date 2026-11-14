@@ -122,3 +122,10 @@ test("planPrompt says which list is open, so \"this list\" means it", () => {
 test("planPrompt asks for only the lists meant; \"this list\" is the open one", () => {
   assert.match(planPrompt({ today: "2026-11-14", weekday: "Saturday", lists: ["Groceries", "Work"], here: "Groceries" }), /"this list" is "Groceries"/);
 });
+
+test("the prompt carries the conversation and questions still waiting", () => {
+  const p = planPrompt({ today: "2026-11-15", weekday: "Sunday", lists: [], earlier: "Plan my gym routine", asked: ["How many days a week?"] });
+  assert.match(p, /Earlier in this conversation[\s\S]*Plan my gym routine/);
+  assert.match(p, /You asked me:\n- How many days a week\?\nWhat I say next answers them/);
+  assert.doesNotMatch(planPrompt({ today: "2026-11-15", weekday: "Sunday", lists: [] }), /Earlier in this conversation|What I say next answers them/);
+});

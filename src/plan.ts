@@ -205,6 +205,8 @@ export function planPrompt(c: {
   rewards?: string[];
   open?: OpenList[]; // lists the person let it read, to change
   here?: string; // the list they have open
+  earlier?: string; // this conversation so far: what was asked and answered (already planned)
+  asked?: string[]; // questions it asked that are still waiting: what comes now answers them
 }) {
   const xp = Object.values(EFFORT_XP).join("/");
   return `You plan my work. Read what I describe below (typed or spoken, in any language or a mix, like Hinglish), work
@@ -282,7 +284,17 @@ ${
   (up to 3) only when I clearly ask about several or all of them.`
   }
 - No other headings, numbers, notes or code fences.
-${(c.open ?? []).map((l) => `\nWhat's in "${l.name}" now:\n${l.md}\n`).join("")}
+${(c.open ?? []).map((l) => `\nWhat's in "${l.name}" now:\n${l.md}\n`).join("")}${
+    c.earlier
+      ? `\nEarlier in this conversation (already planned: don't repeat those tasks, and don't ask again about anything
+I answered):\n${c.earlier}\n`
+      : ""
+  }${
+    c.asked?.length
+      ? `\nYou asked me:\n${c.asked.map((q) => `- ${q}`).join("\n")}\nWhat I say next answers them. Use it, don't ask them again,
+and give me the full plan now.\n`
+      : ""
+  }
 Here's what I need:
 `;
 }
