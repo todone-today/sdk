@@ -286,13 +286,13 @@ ${
 - No other headings, numbers, notes or code fences.
 ${(c.open ?? []).map((l) => `\nWhat's in "${l.name}" now:\n${l.md}\n`).join("")}${
     c.earlier
-      ? `\nEarlier in this conversation (already planned: don't repeat those tasks, and don't ask again about anything
-I answered):\n${c.earlier}\n`
+      ? `\nEarlier in this conversation (already planned: don't repeat those tasks; if I've answered your questions there,
+ask no more, decide the rest yourself):\n${c.earlier}\n`
       : ""
   }${
     c.asked?.length
-      ? `\nYou asked me:\n${c.asked.map((q) => `- ${q}`).join("\n")}\nWhat I say next answers them. Use it, don't ask them again,
-and give me the full plan now.\n`
+      ? `\nYou asked me:\n${c.asked.map((q) => `- ${q}`).join("\n")}\nWhat I say next answers them. Use it and give me the full plan
+now, with no "## Questions" at all: decide anything still open yourself.\n`
       : ""
   }
 Here's what I need:
