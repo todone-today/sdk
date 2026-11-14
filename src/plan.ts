@@ -264,7 +264,8 @@ ${c.here ? `I'm looking at my list "${c.here}": "this list", "here" or "it" mean
   }
 - "## Questions": up to 3, only when an answer would really change the tasks (a deadline I mentioned without a date,
   who something is for, which of two things I meant). Still give your best tasks for everything else. If what I said
-  is too vague to plan at all, reply with only Questions.
+  is too vague to plan at all, reply with only Questions. Once I've answered ("You asked me: … My answer: …"), don't
+  ask again: use my answers, and your judgement where I didn't answer.
 ${
     c.open?.length
       ? `- I've shared what's in ${c.open.map((l) => `"${l.name}"`).join(", ")} below; each task has a number like [#3]. To
