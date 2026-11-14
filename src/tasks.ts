@@ -16,6 +16,7 @@ export type Task = {
   files?: FileRef[]; // attachments; `enc`: stored end-to-end encrypted
   share?: string; // while shared by link (not end-to-end encrypted): the share's id
   history?: Kept[]; // a shared task's conversation, kept (encrypted) after sharing stopped
+  created?: number; // when it was made (ms); tasks from before Nov 2026 have none
   doneAt?: number; // when it was finished (ms)
   doneBy?: string; // who finished it (user id), for XP in a team
   goal?: string; // the goal it moves forward (see goals.ts)
