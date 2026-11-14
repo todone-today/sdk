@@ -248,3 +248,31 @@ test("effort: a size from XS to XL, in Markdown as 💪", () => {
   assert.ok(validTasks([t]));
   assert.ok(!validTasks([{ ...t, effort: "huge" as never }]));
 });
+
+test("repeats: missed ones don't stack, unticking takes the next one back, weekly ones show a day early", async () => {
+  const { leadDays, upcoming, doneToday } = await import("./tasks.ts");
+  // A daily missed for three days: the next one is tomorrow, not a late one.
+  const [d] = parse("- [ ] Stretch 🔁 every day 📅 2026-11-12\n");
+  const ticked = tick([d], d.id, "2026-11-15");
+  assert.equal(ticked[1].due, "2026-11-16");
+  assert.equal(ticked[0].then, ticked[1].id);
+  // Unticking: the next one goes, and the task repeats again from where it was.
+  const back = tick(ticked, ticked[0].id, "2026-11-15");
+  assert.equal(back.length, 1);
+  assert.deepEqual([back[0].done, back[0].rep, back[0].due, back[0].then], [false, "every day", "2026-11-12", undefined]);
+  // Unless the next one was already touched: then it stays.
+  const touched = ticked.map((t, i) => (i === 1 ? { ...t, title: "Stretch longer" } : t));
+  assert.equal(tick(touched, touched[0].id, "2026-11-15").length, 2);
+  // Done today stays in sight; the next daily doesn't show early.
+  assert.equal(doneToday(ticked[0], ticked[0].doneAt ? localDay(ticked[0].doneAt) : ""), true);
+  assert.equal(upcoming(ticked[1], "2026-11-15"), false);
+  // How early: none for daily, a day for weekly, two for monthly.
+  assert.deepEqual(["every day", "every weekday", "every 3 days", "every week", "every 2 weeks", "every month", "every year"].map(leadDays), [0, 0, 0, 1, 1, 2, 2]);
+  const [w] = parse("- [ ] Gym 🔁 every week 📅 2026-11-16\n");
+  assert.equal(upcoming(w, "2026-11-15"), true);
+  assert.equal(upcoming(w, "2026-11-14"), false);
+});
+const localDay = (ms: number) => {
+  const x = new Date(ms);
+  return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`;
+};

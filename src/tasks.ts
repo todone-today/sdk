@@ -18,6 +18,7 @@ export type Task = {
   history?: Kept[]; // a shared task's conversation, kept (encrypted) after sharing stopped
   created?: number; // when it was made (ms); tasks from before Nov 2026 have none
   doneAt?: number; // when it was finished (ms)
+  then?: string; // a finished repeat: the id of the next one it made (unticking takes that back)
   doneBy?: string; // who finished it (user id), for XP in a team
   goal?: string; // the goal it moves forward (see goals.ts)
   sub: Task[];
@@ -316,21 +317,35 @@ export function nextDue(from: string, rule: string): string {
 }
 
 // Ticks a task (or unticks it). Finishing a repeating task keeps it done and adds the next one right after it,
-// due on the next day of its rule, with its steps unticked; the finished one stops repeating.
+// due on the rule's next day after today (a missed one doesn't stack late copies), with its steps unticked; the
+// finished one stops repeating and remembers the next (`then`). Unticking it takes that next one back, if it's
+// still untouched, and the task repeats again from where it was.
 export function tick(tasks: Task[], id: string, today: string, by?: string): Task[] {
-  const next = (t: Task): Task => ({
-    ...t,
-    id: uid(),
-    done: false,
-    doneAt: undefined,
-    doneBy: undefined,
-    spent: undefined,
-    due: nextDue(t.due ?? today, t.rep!),
-    sub: t.sub.map((x) => ({ ...x, id: uid(), done: false, spent: undefined })),
-  });
-  const walk = (ts: Task[]): Task[] =>
-    ts.flatMap((t) => {
-      if (t.id !== id) return [{ ...t, sub: walk(t.sub) }];
+  const next = (t: Task): Task => {
+    let due = nextDue(t.due ?? today, t.rep!);
+    while (due <= today) due = nextDue(due, t.rep!);
+    return {
+      ...t,
+      id: uid(),
+      done: false,
+      doneAt: undefined,
+      doneBy: undefined,
+      spent: undefined,
+      then: undefined,
+      due,
+      sub: t.sub.map((x) => ({ ...x, id: uid(), done: false, spent: undefined })),
+    };
+  };
+  // The next copy a finished repeat made, while nobody has touched it: ticked, renamed or given steps of its own.
+  const untouched = (t: Task, n: Task | undefined) =>
+    !!n && !n.done && !!n.rep && n.title === t.title && n.sub.every((x) => !x.done);
+  const walk = (ts: Task[]): Task[] => {
+    const out: Task[] = [];
+    for (const t of ts) {
+      if (t.id !== id) {
+        out.push({ ...t, sub: walk(t.sub) });
+        continue;
+      }
       // Finishing a task finishes its steps; unticking leaves them as they were.
       const at = Date.now();
       const finish = (t: Task): Task => ({
@@ -340,10 +355,25 @@ export function tick(tasks: Task[], id: string, today: string, by?: string): Tas
         ...(by ? { doneBy: by } : {}),
         sub: t.sub.map((x) => ({ ...x, done: true })),
       });
-      if (t.done) return [{ ...t, done: false, doneAt: undefined, doneBy: undefined }];
-      if (!t.rep) return [finish(t)];
-      return [{ ...finish(t), rep: undefined }, next(t)];
-    });
+      if (t.done) {
+        const n = t.then ? ts.find((x) => x.id === t.then) : undefined;
+        const back = { ...t, done: false, doneAt: undefined, doneBy: undefined, then: undefined };
+        if (untouched(t, n)) {
+          out.push({ ...back, rep: n!.rep });
+          skip.add(n!.id);
+        } else out.push(back);
+        continue;
+      }
+      if (!t.rep) {
+        out.push(finish(t));
+        continue;
+      }
+      const n = next(t);
+      out.push({ ...finish(t), rep: undefined, then: n.id }, n);
+    }
+    return out.filter((t) => !skip.has(t.id));
+  };
+  const skip = new Set<string>();
   return walk(tasks);
 }
 
@@ -361,8 +391,33 @@ export function repeatLabel(rule: string): string {
   return named[r] ?? r[0].toUpperCase() + r.slice(1);
 }
 
-// A repeating task whose next day hasn't come: it waits out of sight (in Open and the counts) until then.
+// A repeating task whose next day hasn't come: it isn't counted, and its box stays locked until then.
 export const waiting = (t: Task, today: string) => !t.done && !!t.rep && !!t.due && t.due > today;
+
+// How many days ahead a waiting repeat shows (faded, "up next") so what's coming is no surprise: none for daily
+// and other short repeats (they'd never feel finished), a day for weekly ones, two for monthly and yearly.
+export function leadDays(rule: string): number {
+  const m = REPEAT.exec(rule.trim());
+  if (!m || /week(day|end)/i.test(rule)) return 0;
+  const k = +(m[1] ?? 1);
+  const unit = m[2].toLowerCase();
+  if (unit === "day") return k >= 7 ? 1 : 0;
+  if (unit === "week") return 1;
+  return 2;
+}
+const plus = (day: string, n: number) => {
+  const d = D(day);
+  d.setUTCDate(d.getUTCDate() + n);
+  return iso(d);
+};
+// A waiting repeat close enough to show early.
+export const upcoming = (t: Task, today: string) => waiting(t, today) && t.due! <= plus(today, leadDays(t.rep!));
+// A repeat finished today: it stays in sight, done, until the day ends ("back tomorrow").
+export const doneToday = (t: Task, today: string) => {
+  if (!t.done || !t.then || !t.doneAt) return false;
+  const d = new Date(t.doneAt);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}` === today;
+};
 
 // Markdown with "## List name" headings split into lists; tasks before any heading have no list (null).
 export function parseLists(md: string): { name: string | null; tasks: Task[] }[] {
